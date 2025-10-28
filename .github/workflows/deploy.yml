@@ -92,7 +92,7 @@ jobs:
           db_password=${{ secrets.DB_PASSWORD }}
           EOF
 
-       - name: Run Ansible Playbook
+      - name: Run Ansible Playbook
          run: |
            ansible-playbook -i inventory.ini ansible/playbook.yml \
              -e "db_host=${{ steps.terraform-outputs.outputs.db_host }}" \
