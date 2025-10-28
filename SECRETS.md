@@ -2,16 +2,17 @@
 
 These must be added to your GitHub repo Settings > Secrets and variables > Actions for automated deployment.
 
-| Secret Name           | Description                          | Current Value | Source/Example Value                                  |
-| --------------------- | ------------------------------------ | ------------- | ----------------------------------------------------- |
-| `GCP_PROJECT_ID`      | GCP project identifier               | `riderwin-flarum` | From GCP Console > Project Info                       |
-| `GCP_SA_KEY`          | Service account JSON key             | ✅ Configured | Contents of `flarum-deployer-key.json`                |
-| `GCP_SSH_PRIVATE_KEY` | Private SSH key for VM access        | ✅ Configured | Contents of `~/.ssh/flarum_devops`                    |
-| `DB_PASSWORD`         | Database password for Flarum         | `RiderWin123!@#` | User-defined strong password                          |
+| Secret Name           | Description                   | Current Value     | Source/Example Value                   |
+| --------------------- | ----------------------------- | ----------------- | -------------------------------------- |
+| `GCP_PROJECT_ID`      | GCP project identifier        | `riderwin-flarum` | From GCP Console > Project Info        |
+| `GCP_SA_KEY`          | Service account JSON key      | ✅ Configured     | Contents of `flarum-deployer-key.json` |
+| `GCP_SSH_PRIVATE_KEY` | Private SSH key for VM access | ✅ Configured     | Contents of `~/.ssh/flarum_devops`     |
+| `DB_PASSWORD`         | Database password for Flarum  | `RiderWin123!@#`  | User-defined strong password           |
 
 ## 🔧 Setup Instructions
 
 ### 1. GCP Service Account Key (`GCP_SA_KEY`)
+
 ```bash
 # Create service account (if not exists)
 gcloud iam service-accounts create flarum-deployer \
@@ -35,6 +36,7 @@ gcloud iam service-accounts keys create flarum-deployer-key.json \
 ```
 
 ### 2. SSH Key Setup (`GCP_SSH_PRIVATE_KEY`)
+
 ```bash
 # Generate SSH key pair (if not exists)
 ssh-keygen -t rsa -b 4096 -C "flarum-deploy" -f ~/.ssh/flarum_devops
@@ -46,6 +48,7 @@ gcloud compute project-info add-metadata \
 ```
 
 ### 3. GitHub Secrets Configuration
+
 ```bash
 # Set all secrets via GitHub CLI
 gh secret set GCP_PROJECT_ID --body "riderwin-flarum"
@@ -65,11 +68,13 @@ gh secret set DB_PASSWORD --body "RiderWin123!@#"
 ## 🔍 Verification
 
 Check if all secrets are properly configured:
+
 ```bash
 gh secret list
 ```
 
 Expected output:
+
 ```
 DB_PASSWORD	2025-10-28T21:13:11Z
 GCP_PROJECT_ID	2025-10-28T20:55:15Z
