@@ -1,0 +1,13 @@
+# Ansible Inventory Example
+# Copy this file to inventory.ini and update with your VM IP
+
+[flarum]
+# Replace with your actual VM IP address
+YOUR_VM_IP ansible_user=rocky ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+[flarum:vars]
+# These will be populated by GitHub Actions or set manually
+db_host=YOUR_DB_HOST
+db_name=flarum
+db_user=flarum
+db_password=YOUR_DB_PASSWORD

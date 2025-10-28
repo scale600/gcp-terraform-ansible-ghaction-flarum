@@ -1,0 +1,21 @@
+<?php return array(
+    'debug' => false,
+    'database' => array(
+        'driver'    => 'mysql',
+        'host'      => '{{ db_host }}',
+        'database'  => '{{ db_name }}',
+        'username'  => '{{ db_user }}',
+        'password'  => '{{ db_password }}',
+        'charset'   => 'utf8mb4',
+        'collation' => 'utf8mb4_unicode_ci',
+        'prefix'    => '',
+        'strict'    => false,
+        'engine'    => 'InnoDB',
+        'prefix_indexes' => true,
+    ),
+    'url' => 'http://{{ ansible_default_ipv4.address }}',
+    'paths' => array(
+        'api' => 'api',
+        'admin' => 'admin',
+    ),
+);

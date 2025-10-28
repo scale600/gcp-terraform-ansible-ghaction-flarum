@@ -1,0 +1,47 @@
+name: Destroy Flarum Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm infrastructure destruction'
+        required: true
+        default: ""
+
+jobs:
+  destroy:
+    name: Destroy Flarum Infrastructure
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_destroy == 'DESTROY'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+
+      - name: Configure GCP credentials
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Terraform Destroy
+        working-directory: ./terraform
+        run: |
+          terraform destroy \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -auto-approve
+
+      - name: Confirm Destruction
+        run: echo "✅ Flarum infrastructure has been destroyed"

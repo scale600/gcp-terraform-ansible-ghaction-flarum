@@ -1,0 +1,49 @@
+# Log rotation for Flarum on e2-micro
+# Optimized for minimal disk usage
+
+/var/log/nginx/*.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 0644 nginx nginx
+    postrotate
+        /bin/kill -USR1 `cat /var/run/nginx.pid 2>/dev/null` 2>/dev/null || true
+    endscript
+}
+
+/var/log/php-fpm/*.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 0644 nginx nginx
+    postrotate
+        /bin/kill -SIGUSR1 `cat /var/opt/remi/php81/run/php-fpm.pid 2>/dev/null` 2>/dev/null || true
+    endscript
+}
+
+/var/log/flarum/*.log {
+    daily
+    missingok
+    rotate 3
+    compress
+    delaycompress
+    notifempty
+    create 0644 nginx nginx
+}
+
+# Memory monitoring logs
+/var/log/flarum/memory.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 0644 root root
+}

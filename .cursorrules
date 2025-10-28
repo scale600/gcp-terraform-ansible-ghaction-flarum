@@ -1,0 +1,24 @@
+---
+description: Rules for GCP Flarum Project in Cursor IDE
+globs: ["**/*.tf", "**/*.yml", "**/*.yaml", "**/*.md"]
+alwaysApply: true
+---
+
+# Project-Specific Guidelines
+
+- Use Rocky Linux 9 for all VM configurations (image: rocky-linux-cloud/rocky-linux-9-optimized-gcp)
+- Always include 2GB swap setup in Ansible tasks for e2-micro stability
+- Terraform: Keep resources minimal (e2-micro, db-f1-micro); output VM IP and DB host for Ansible
+- Ansible: Use dnf for package management; enable Remi repo for PHP 8.1
+- GitHub Actions: Trigger on push to main; chain Terraform apply → Ansible playbook
+- Code Style: HCL for Terraform (indent 2 spaces); YAML for Ansible (2-space indent)
+- Context: Reference @REQUIREMENTS.md for core specs; avoid paid GCP features
+
+# Generation Rules
+
+- When editing Terraform: Suggest Free Tier validations (e.g., machine_type="e2-micro")
+- For Ansible tasks: Prioritize idempotent operations; include error handling for dnf installs
+- CI/CD: Ensure secrets (GCP_PROJECT_ID, GCP_SSH_PRIVATE_KEY, DB_PASSWORD) are referenced securely
+- Responses: Be concise; explain changes with bullet points; reference affected files (e.g., @terraform/main.tf)
+
+@FILE_STRUCTURE.md # Include project structure as context

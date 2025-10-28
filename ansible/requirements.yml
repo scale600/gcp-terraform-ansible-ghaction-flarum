@@ -1,0 +1,8 @@
+# Ansible requirements for Flarum deployment
+# No external collections required for this deployment
+
+collections:
+  - name: community.general
+    version: ">=6.0.0"
+  - name: community.mysql
+    version: ">=3.0.0"
