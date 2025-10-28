@@ -102,8 +102,6 @@ resource "google_sql_database_instance" "flarum_db" {
       hour = 3
     }
     
-    deletion_protection = false
-    
     ip_configuration {
       ipv4_enabled = true
       authorized_networks {
@@ -159,7 +157,7 @@ resource "google_compute_instance" "flarum_vm" {
   tags = ["flarum-web"]
 
   metadata = {
-    ssh-keys = "rocky:${file("~/.ssh/id_rsa.pub")}"
+    ssh-keys = "rocky:${file("${path.module}/../ansible/flarum_devops.pub")}"
   }
 
   metadata_startup_script = <<-EOF

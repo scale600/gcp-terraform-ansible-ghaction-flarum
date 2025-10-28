@@ -20,6 +20,7 @@ flarum-deploy*
 # GCP Service Account Keys
 *service-account*.json
 *flarum-deployer*.json
+riderwin-flarum-*.json
 
 # OS generated files
 .DS_Store
