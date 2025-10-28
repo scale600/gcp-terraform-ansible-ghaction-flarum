@@ -104,10 +104,6 @@ resource "google_sql_database_instance" "flarum_db" {
     
     ip_configuration {
       ipv4_enabled = true
-      authorized_networks {
-        name  = "flarum-subnet"
-        value = google_compute_subnetwork.flarum_subnet.ip_cidr_range
-      }
     }
   }
 }
