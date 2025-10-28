@@ -75,9 +75,9 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ steps.terraform-outputs.outputs.vm_ip }} >> ~/.ssh/known_hosts
 
-       - name: Wait for VM to be ready
-         run: |
-           timeout 180 bash -c 'until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no rocky@${{ steps.terraform-outputs.outputs.vm_ip }} "echo VM is ready"; do sleep 15; done'
+      - name: Wait for VM to be ready
+        run: |
+          timeout 180 bash -c 'until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no rocky@${{ steps.terraform-outputs.outputs.vm_ip }} "echo VM is ready"; do sleep 15; done'
 
       - name: Create Ansible inventory
         run: |
@@ -93,14 +93,14 @@ jobs:
           EOF
 
       - name: Run Ansible Playbook
-         run: |
-           ansible-playbook -i inventory.ini ansible/playbook.yml \
-             -e "db_host=${{ steps.terraform-outputs.outputs.db_host }}" \
-             -e "db_name=${{ steps.terraform-outputs.outputs.db_name }}" \
-             -e "db_user=${{ steps.terraform-outputs.outputs.db_user }}" \
-             -e "db_password=${{ secrets.DB_PASSWORD }}" \
-             --timeout=60 \
-             --forks=1
+        run: |
+          ansible-playbook -i inventory.ini ansible/playbook.yml \
+            -e "db_host=${{ steps.terraform-outputs.outputs.db_host }}" \
+            -e "db_name=${{ steps.terraform-outputs.outputs.db_name }}" \
+            -e "db_user=${{ steps.terraform-outputs.outputs.db_user }}" \
+            -e "db_password=${{ secrets.DB_PASSWORD }}" \
+            --timeout=60 \
+            --forks=1
 
       - name: Verify Deployment
         run: |
