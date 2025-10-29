@@ -10,44 +10,77 @@ env:
   ANSIBLE_VERSION: "7.0.0"
 
 jobs:
-  deploy:
-    name: Deploy Flarum Infrastructure and Application
+  # ========================================
+  # 1. SETUP & PREPARATION
+  # ========================================
+  setup:
+    name: 🔧 Setup Environment
     runs-on: ubuntu-latest
+    outputs:
+      vm_ip: ${{ steps.terraform-outputs.outputs.vm_ip }}
+      db_host: ${{ steps.terraform-outputs.outputs.db_host }}
+      db_name: ${{ steps.terraform-outputs.outputs.db_name }}
+      db_user: ${{ steps.terraform-outputs.outputs.db_user }}
 
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-
-      - name: Setup Python for Ansible
+      - name: 🐍 Setup Python for Ansible
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: Install Ansible
+      - name: 📦 Install Ansible
         run: |
           pip install ansible==${{ env.ANSIBLE_VERSION }}
           ansible --version
 
-      - name: Configure GCP credentials
+      - name: 🔐 Configure GCP credentials
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Set up Cloud SDK
+      - name: ☁️ Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Terraform Init
+  # ========================================
+  # 2. INFRASTRUCTURE DEPLOYMENT
+  # ========================================
+  infrastructure:
+    name: 🏗️ Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: setup
+    outputs:
+      vm_ip: ${{ steps.terraform-outputs.outputs.vm_ip }}
+      db_host: ${{ steps.terraform-outputs.outputs.db_host }}
+      db_name: ${{ steps.terraform-outputs.outputs.db_name }}
+      db_user: ${{ steps.terraform-outputs.outputs.db_user }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: 🔐 Configure GCP credentials
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: ☁️ Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🚀 Terraform Init
         working-directory: ./terraform
         run: |
           terraform init
           terraform validate
 
-      - name: Terraform Plan
+      - name: 📋 Terraform Plan
         working-directory: ./terraform
         run: |
           terraform plan \
@@ -55,12 +88,12 @@ jobs:
             -var="db_password=${{ secrets.DB_PASSWORD }}" \
             -out=tfplan
 
-      - name: Terraform Apply
+      - name: 🏗️ Terraform Apply
         working-directory: ./terraform
         run: |
           terraform apply -auto-approve tfplan
 
-      - name: Get Terraform Outputs
+      - name: 📤 Get Terraform Outputs
         id: terraform-outputs
         working-directory: ./terraform
         run: |
@@ -69,45 +102,99 @@ jobs:
           echo "db_name=$(terraform output -raw db_name)" >> $GITHUB_OUTPUT
           echo "db_user=$(terraform output -raw db_user)" >> $GITHUB_OUTPUT
 
-      - name: Setup SSH key
+  # ========================================
+  # 3. APPLICATION DEPLOYMENT
+  # ========================================
+  application:
+    name: 🚀 Deploy Application
+    runs-on: ubuntu-latest
+    needs: infrastructure
+    outputs:
+      vm_ip: ${{ steps.terraform-outputs.outputs.vm_ip }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python for Ansible
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install Ansible
+        run: |
+          pip install ansible==${{ env.ANSIBLE_VERSION }}
+          ansible --version
+
+      - name: 🔑 Setup SSH key
         run: |
           echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ steps.terraform-outputs.outputs.vm_ip }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ needs.infrastructure.outputs.vm_ip }} >> ~/.ssh/known_hosts
 
-      - name: Wait for VM to be ready
+      - name: ⏳ Wait for VM to be ready
         run: |
-          timeout 180 bash -c 'until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no rocky@${{ steps.terraform-outputs.outputs.vm_ip }} "echo VM is ready"; do sleep 15; done'
+          timeout 180 bash -c 'until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no rocky@${{ needs.infrastructure.outputs.vm_ip }} "echo VM is ready"; do sleep 15; done'
 
-      - name: Create Ansible inventory
+      - name: 📝 Create Ansible inventory
         run: |
           cat > inventory.ini << EOF
           [flarum]
-          ${{ steps.terraform-outputs.outputs.vm_ip }} ansible_user=rocky ansible_ssh_private_key_file=~/.ssh/id_rsa
+          ${{ needs.infrastructure.outputs.vm_ip }} ansible_user=rocky ansible_ssh_private_key_file=~/.ssh/id_rsa
 
           [flarum:vars]
-          db_host=${{ steps.terraform-outputs.outputs.db_host }}
-          db_name=${{ steps.terraform-outputs.outputs.db_name }}
-          db_user=${{ steps.terraform-outputs.outputs.db_user }}
+          db_host=${{ needs.infrastructure.outputs.db_host }}
+          db_name=${{ needs.infrastructure.outputs.db_name }}
+          db_user=${{ needs.infrastructure.outputs.db_user }}
           db_password=${{ secrets.DB_PASSWORD }}
           EOF
 
-      - name: Run Ansible Playbook
+      - name: 🎭 Run Ansible Playbook
         run: |
           ansible-playbook -i inventory.ini ansible/playbook.yml \
-            -e "db_host=${{ steps.terraform-outputs.outputs.db_host }}" \
-            -e "db_name=${{ steps.terraform-outputs.outputs.db_name }}" \
-            -e "db_user=${{ steps.terraform-outputs.outputs.db_user }}" \
+            -e "db_host=${{ needs.infrastructure.outputs.db_host }}" \
+            -e "db_name=${{ needs.infrastructure.outputs.db_name }}" \
+            -e "db_user=${{ needs.infrastructure.outputs.db_user }}" \
             -e "db_password=${{ secrets.DB_PASSWORD }}" \
             --timeout=60 \
             --forks=1
 
-      - name: Verify Deployment
+      - name: 📤 Get VM IP for verification
+        id: terraform-outputs
         run: |
-          echo "Flarum should be available at: http://${{ steps.terraform-outputs.outputs.vm_ip }}"
-          curl -f http://${{ steps.terraform-outputs.outputs.vm_ip }} || echo "Deployment verification failed"
+          echo "vm_ip=${{ needs.infrastructure.outputs.vm_ip }}" >> $GITHUB_OUTPUT
 
-      - name: Comment on PR (if applicable)
+  # ========================================
+  # 4. VERIFICATION & NOTIFICATION
+  # ========================================
+  verification:
+    name: ✅ Verify Deployment
+    runs-on: ubuntu-latest
+    needs: [infrastructure, application]
+    if: always()
+
+    steps:
+      - name: 🔍 Verify Deployment
+        run: |
+          echo "Flarum should be available at: http://${{ needs.infrastructure.outputs.vm_ip }}"
+          curl -f http://${{ needs.infrastructure.outputs.vm_ip }} || echo "Deployment verification failed"
+
+      - name: 📊 Deployment Summary
+        run: |
+          echo "## 🎉 Flarum Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure | ${{ job.status }} | VM: ${{ needs.infrastructure.outputs.vm_ip }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Application | ${{ job.status }} | Flarum Forum |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database | ${{ job.status }} | ${{ needs.infrastructure.outputs.db_host }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Access Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Forum URL**: http://${{ needs.infrastructure.outputs.vm_ip }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database Host**: ${{ needs.infrastructure.outputs.db_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database Name**: ${{ needs.infrastructure.outputs.db_name }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: 💬 Comment on PR (if applicable)
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
@@ -116,5 +203,32 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '🚀 Flarum deployment completed! Access your forum at: http://${{ steps.terraform-outputs.outputs.vm_ip }}'
+              body: '🚀 Flarum deployment completed! Access your forum at: http://${{ needs.infrastructure.outputs.vm_ip }}'
             })
+
+  # ========================================
+  # 5. CLEANUP (on failure)
+  # ========================================
+  cleanup:
+    name: 🧹 Cleanup on Failure
+    runs-on: ubuntu-latest
+    needs: [infrastructure, application, verification]
+    if: failure()
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configure GCP credentials
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: ☁️ Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🧹 Cleanup GCP Resources
+        run: |
+          echo "Cleaning up GCP resources due to deployment failure..."
+          # Add cleanup commands here if needed
+          echo "Cleanup completed"

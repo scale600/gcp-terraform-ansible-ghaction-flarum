@@ -1,156 +1,156 @@
-# 최소 사양 최적화 가이드
+# Minimal Specification Optimization Guide
 
-## 🎯 최적화 목표
+## 🎯 Optimization Goals
 
-GCP Free Tier 한도 내에서 최대한 효율적인 Flarum 포럼 운영을 위한 최적화 설정입니다.
+Optimization settings for efficient Flarum forum operation within GCP Free Tier limits.
 
-## 📊 리소스 사용량 최적화
+## 📊 Resource Usage Optimization
 
-### 1. 디스크 사용량 최적화
+### 1. Disk Usage Optimization
 
-- **VM 디스크**: 30GB → 20GB (33% 절약)
-- **로그 로테이션**: 7일 보관 후 자동 삭제
-- **압축**: 로그 파일 gzip 압축
+- **VM Disk**: 30GB → 20GB (33% savings)
+- **Log Rotation**: Auto-delete after 7 days
+- **Compression**: gzip compression for log files
 
-### 2. 메모리 사용량 최적화
+### 2. Memory Usage Optimization
 
-- **PHP 메모리 제한**: 256MB → 128MB (50% 절약)
-- **PHP-FPM 프로세스**: 최대 5개 → 3개 (40% 절약)
-- **Nginx 워커**: 1개로 제한
-- **스왑 파일**: 2GB 설정으로 안정성 확보
+- **PHP Memory Limit**: 256MB → 128MB (50% savings)
+- **PHP-FPM Processes**: Max 5 → 3 (40% savings)
+- **Nginx Workers**: Limited to 1
+- **Swap File**: 2GB for stability
 
-### 3. CPU 사용량 최적화
+### 3. CPU Usage Optimization
 
-- **PHP 실행 시간**: 300초 → 180초
-- **Nginx 설정**: epoll, multi_accept 활성화
-- **Gzip 압축**: 레벨 6으로 최적화
+- **PHP Execution Time**: 300s → 180s
+- **Nginx Configuration**: epoll, multi_accept enabled
+- **Gzip Compression**: Optimized to level 6
 
-## 🔧 주요 최적화 설정
+## 🔧 Key Optimization Settings
 
-### Terraform 최적화
+### Terraform Optimization
 
 ```hcl
-# 디스크 크기 최적화
-size = 20  # 30GB에서 20GB로 감소
+# Disk size optimization
+size = 20  # Reduced from 30GB to 20GB
 
-# 백업 비활성화
+# Disable backups
 backup_configuration {
   enabled = false
 }
 
-# 유지보수 창 설정
+# Maintenance window
 maintenance_window {
   day = 7
   hour = 3
 }
 ```
 
-### PHP-FPM 최적화
+### PHP-FPM Optimization
 
 ```ini
-; e2-micro에 최적화된 설정
-pm.max_children = 3        # 5에서 3으로 감소
-pm.start_servers = 1       # 2에서 1로 감소
-pm.max_spare_servers = 2   # 3에서 2로 감소
-memory_limit = 128M        # 256M에서 128M로 감소
+; Optimized for e2-micro
+pm.max_children = 3        # Reduced from 5 to 3
+pm.start_servers = 1       # Reduced from 2 to 1
+pm.max_spare_servers = 2   # Reduced from 3 to 2
+memory_limit = 128M        # Reduced from 256M to 128M
 ```
 
-### Nginx 최적화
+### Nginx Optimization
 
 ```nginx
-# 단일 워커 프로세스
+# Single worker process
 worker_processes 1;
 worker_connections 256;
 
-# 압축 최적화
+# Compression optimization
 gzip_comp_level 6;
 gzip_min_length 1024;
 
-# 업로드 크기 제한
+# Upload size limit
 client_max_body_size 8M;
 ```
 
-## 📈 성능 모니터링
+## 📈 Performance Monitoring
 
-### 메모리 사용량 모니터링
+### Memory Usage Monitoring
 
 ```bash
-# 실시간 메모리 사용량 확인
+# Real-time memory usage check
 watch -n 5 'free -h && echo "---" && ps aux --sort=-%mem | head -5'
 ```
 
-### 디스크 사용량 모니터링
+### Disk Usage Monitoring
 
 ```bash
-# 디스크 사용량 확인
+# Check disk usage
 df -h
 du -sh /var/log/*
 ```
 
-### 서비스 상태 확인
+### Service Status Check
 
 ```bash
-# PHP-FPM 프로세스 확인
+# Check PHP-FPM processes
 ps aux | grep php-fpm
 sudo systemctl status php81-php-fpm
 
-# Nginx 상태 확인
+# Check Nginx status
 sudo systemctl status nginx
 ```
 
-## ⚠️ 주의사항
+## ⚠️ Precautions
 
-### 메모리 부족 시 대응
+### Memory Shortage Response
 
-1. **스왑 사용량 확인**: `swapon -s`
-2. **PHP-FPM 프로세스 수 조정**: 필요시 2개로 더 감소
-3. **로그 정리**: `sudo logrotate -f /etc/logrotate.d/flarum`
+1. **Check swap usage**: `swapon -s`
+2. **Adjust PHP-FPM process count**: Reduce to 2 if needed
+3. **Clean logs**: `sudo logrotate -f /etc/logrotate.d/flarum`
 
-### 디스크 공간 부족 시 대응
+### Disk Space Shortage Response
 
-1. **로그 파일 정리**: `sudo find /var/log -name "*.log" -mtime +7 -delete`
-2. **임시 파일 정리**: `sudo find /tmp -type f -mtime +1 -delete`
-3. **Flarum 캐시 정리**: `sudo rm -rf /var/www/flarum/storage/cache/*`
+1. **Clean log files**: `sudo find /var/log -name "*.log" -mtime +7 -delete`
+2. **Clean temp files**: `sudo find /tmp -type f -mtime +1 -delete`
+3. **Clean Flarum cache**: `sudo rm -rf /var/www/flarum/storage/cache/*`
 
-## 🚀 성능 향상 팁
+## 🚀 Performance Enhancement Tips
 
-### 1. 정적 파일 캐싱
+### 1. Static File Caching
 
-- Nginx에서 정적 파일 직접 서빙
-- 브라우저 캐싱 설정 최적화
+- Direct static file serving via Nginx
+- Optimized browser caching settings
 
-### 2. 데이터베이스 최적화
+### 2. Database Optimization
 
-- 불필요한 데이터 정기 정리
-- 인덱스 최적화
+- Regular cleanup of unnecessary data
+- Index optimization
 
-### 3. 모니터링 설정
+### 3. Monitoring Setup
 
-- 리소스 사용량 정기 확인
-- 로그 파일 크기 모니터링
+- Regular resource usage checks
+- Log file size monitoring
 
-## 📋 최적화 체크리스트
+## 📋 Optimization Checklist
 
-- [ ] 디스크 사용량 20GB 이하 유지
-- [ ] 메모리 사용량 1GB 이하 유지
-- [ ] PHP-FPM 프로세스 3개 이하 유지
-- [ ] 로그 파일 7일 이상 보관하지 않음
-- [ ] 정기적인 리소스 모니터링 수행
+- [ ] Keep disk usage below 20GB
+- [ ] Keep memory usage below 1GB
+- [ ] Keep PHP-FPM processes below 3
+- [ ] Don't keep log files for more than 7 days
+- [ ] Perform regular resource monitoring
 
-## 🔄 정기 유지보수
+## 🔄 Regular Maintenance
 
-### 주간 작업
+### Weekly Tasks
 
-- [ ] 디스크 사용량 확인
-- [ ] 메모리 사용량 확인
-- [ ] 로그 파일 정리
+- [ ] Check disk usage
+- [ ] Check memory usage
+- [ ] Clean log files
 
-### 월간 작업
+### Monthly Tasks
 
-- [ ] GCP 비용 확인
-- [ ] 성능 분석
-- [ ] 보안 업데이트 확인
+- [ ] Check GCP costs
+- [ ] Performance analysis
+- [ ] Security update checks
 
 ---
 
-이 최적화 설정으로 GCP Free Tier 한도 내에서 안정적인 Flarum 포럼 운영이 가능합니다.
+This optimization setup enables stable Flarum forum operation within GCP Free Tier limits.
