@@ -136,18 +136,19 @@ jobs:
           echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           # Use hardcoded IP if infrastructure was skipped
-          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.63.202.66' }}"
-          ssh-keyscan -H $VM_IP >> ~/.ssh/known_hosts
+          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.60.101.134' }}"
+          # Add VM to known_hosts with timeout
+          timeout 30 ssh-keyscan -H $VM_IP >> ~/.ssh/known_hosts || echo "SSH key scan failed, continuing..."
 
       - name: ⏳ Wait for VM to be ready
         run: |
-          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.63.202.66' }}"
+          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.60.101.134' }}"
           timeout 180 bash -c 'until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no rocky@$VM_IP "echo VM is ready"; do sleep 15; done'
 
       - name: 📝 Create Ansible inventory
         run: |
-          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.63.202.66' }}"
-          DB_HOST="${{ needs.infrastructure.outputs.db_host || '34.63.202.66' }}"
+          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.60.101.134' }}"
+          DB_HOST="${{ needs.infrastructure.outputs.db_host || '34.60.101.134' }}"
           DB_NAME="${{ needs.infrastructure.outputs.db_name || 'flarum' }}"
           DB_USER="${{ needs.infrastructure.outputs.db_user || 'flarum' }}"
           cat > inventory.ini << EOF
@@ -163,8 +164,8 @@ jobs:
 
       - name: 🎭 Run Ansible Playbook
         run: |
-          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.63.202.66' }}"
-          DB_HOST="${{ needs.infrastructure.outputs.db_host || '34.63.202.66' }}"
+          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.60.101.134' }}"
+          DB_HOST="${{ needs.infrastructure.outputs.db_host || '34.60.101.134' }}"
           DB_NAME="${{ needs.infrastructure.outputs.db_name || 'flarum' }}"
           DB_USER="${{ needs.infrastructure.outputs.db_user || 'flarum' }}"
           ansible-playbook -i inventory.ini ansible/playbook.yml \
@@ -178,7 +179,7 @@ jobs:
       - name: 📤 Get VM IP for verification
         id: terraform-outputs
         run: |
-          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.63.202.66' }}"
+          VM_IP="${{ needs.infrastructure.outputs.vm_ip || '34.60.101.134' }}"
           echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
 
   # ========================================
