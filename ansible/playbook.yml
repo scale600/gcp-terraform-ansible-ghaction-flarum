@@ -1,16 +1,13 @@
 ---
-# Ansible Playbook for Flarum Installation on Rocky Linux 9
+# Ansible Playbook for Flarum Installation on Ubuntu 22.04 LTS
 # Optimized for GCP Free Tier e2-micro with 2GB swap
 
-- name: Deploy Flarum on Rocky Linux 9
+- name: Deploy Flarum on Ubuntu 22.04
   hosts: all
   become: yes
   gather_facts: no
   vars:
-    flarum_version: "1.8.2"
     php_version: "8.1"
-    nginx_user: "nginx"
-    flarum_user: "flarum"
     flarum_home: "/var/www/flarum"
     db_host: "{{ hostvars['localhost']['db_host'] | default('localhost') }}"
     db_name: "{{ hostvars['localhost']['db_name'] | default('flarum') }}"
@@ -20,76 +17,52 @@
   tasks:
     - name: Wait for system to become reachable
       wait_for_connection:
-        timeout: 300
-        delay: 10
+        timeout: 180
+        delay: 5
       retries: 3
-      delay: 20
+      delay: 10
       register: connection_result
       until: connection_result is success
     
     - name: Gather facts
       setup:
     
-    - name: Update system packages
-      dnf:
-        name: "*"
-        state: latest
-      register: update_result
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
       retries: 3
+      delay: 5
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: safe
+      retries: 2
       delay: 10
 
-    - name: Install EPEL repository
-      dnf:
-        name: epel-release
-        state: present
-
-    - name: Install Remi repository for PHP 8.1
-      dnf:
-        name: "https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
-        state: present
-
-    - name: Enable Remi PHP 8.1 repository
-      command: dnf module enable php:remi-8.1 -y
-      changed_when: true
-
     - name: Install required packages
-      dnf:
+      apt:
         name:
           - nginx
-          - php81-php
-          - php81-php-fpm
-          - php81-php-mysqlnd
-          - php81-php-gd
-          - php81-php-mbstring
-          - php81-php-xml
-          - php81-php-zip
-          - php81-php-curl
-          - php81-php-opcache
-          - php81-php-intl
-          - php81-php-bcmath
-          - php81-php-json
-          - php81-php-fileinfo
-          - php81-php-tokenizer
-          - php81-php-openssl
-          - php81-php-pdo
-          - php81-php-dom
-          - php81-php-filter
-          - php81-php-hash
-          - php81-php-iconv
-          - php81-php-json
-          - php81-php-mbstring
-          - php81-php-openssl
-          - php81-php-pcre
-          - php81-php-pdo
-          - php81-php-session
-          - php81-php-simplexml
-          - php81-php-xml
-          - php81-php-zlib
+          - php{{ php_version }}
+          - php{{ php_version }}-fpm
+          - php{{ php_version }}-mysql
+          - php{{ php_version }}-gd
+          - php{{ php_version }}-mbstring
+          - php{{ php_version }}-xml
+          - php{{ php_version }}-zip
+          - php{{ php_version }}-curl
+          - php{{ php_version }}-opcache
+          - php{{ php_version }}-intl
+          - php{{ php_version }}-bcmath
+          - php{{ php_version }}-tokenizer
+          - php{{ php_version }}-dom
           - composer
           - git
           - unzip
           - wget
           - curl
+          - mysql-server
         state: present
       retries: 3
       delay: 5
@@ -120,6 +93,7 @@
         - name: Enable swap file
           command: swapon /swapfile
           when: not swap_file.stat.exists
+          ignore_errors: yes
 
         - name: Add swap to fstab for persistence
           lineinfile:
@@ -129,229 +103,149 @@
 
     - name: Optimize swap settings for e2-micro
       block:
-        - name: Set swappiness to 10 (less aggressive swap usage)
+        - name: Set swappiness to 10
           sysctl:
             name: vm.swappiness
             value: "10"
             state: present
             reload: yes
 
-        - name: Set vfs_cache_pressure to 50 (better file system caching)
+        - name: Set vfs_cache_pressure to 50
           sysctl:
             name: vm.vfs_cache_pressure
             value: "50"
             state: present
             reload: yes
 
-        - name: Set dirty_ratio to 15 (faster writeback)
-          sysctl:
-            name: vm.dirty_ratio
-            value: "15"
-            state: present
-            reload: yes
+    - name: Start and enable MySQL
+      systemd:
+        name: mysql
+        state: started
+        enabled: yes
 
-        - name: Set dirty_background_ratio to 5
-          sysctl:
-            name: vm.dirty_background_ratio
-            value: "5"
-            state: present
-            reload: yes
+    - name: Create Flarum database
+      mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        encoding: utf8mb4
+        collation: utf8mb4_unicode_ci
+      become: yes
+      become_user: root
 
-        - name: Make sysctl settings persistent
-          copy:
-            content: |
-              # Swap optimization for e2-micro
-              vm.swappiness=10
-              vm.vfs_cache_pressure=50
-              vm.dirty_ratio=15
-              vm.dirty_background_ratio=5
-            dest: /etc/sysctl.d/99-flarum-optimization.conf
-            mode: "0644"
-
-    - name: Create flarum user
-      user:
-        name: "{{ flarum_user }}"
-        system: yes
-        shell: /bin/bash
-        home: "{{ flarum_home }}"
-        create_home: yes
+    - name: Create Flarum database user
+      mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: "{{ db_name }}.*:ALL"
+        host: "localhost"
+        state: present
+      become: yes
+      become_user: root
+      no_log: true
 
     - name: Create flarum directory
       file:
         path: "{{ flarum_home }}"
         state: directory
-        owner: "{{ flarum_user }}"
-        group: "{{ flarum_user }}"
+        owner: www-data
+        group: www-data
         mode: "0755"
 
-    - name: Download and install Flarum
-      block:
-        - name: Download Flarum installer
-          get_url:
-            url: "https://flarum.org/installer"
-            dest: "/tmp/flarum-installer"
-            mode: "0755"
+    - name: Install Flarum using Composer
+      composer:
+        command: create-project
+        arguments: flarum/flarum . --stability=beta
+        working_dir: "{{ flarum_home }}"
+      become_user: www-data
+      environment:
+        COMPOSER_ALLOW_SUPERUSER: "1"
 
-        - name: Run Flarum installer
-          command: >
-            /tmp/flarum-installer
-            --file={{ flarum_home }}/flarum-{{ flarum_version }}.tar.gz
-            --path={{ flarum_home }}
-            --version={{ flarum_version }}
-          become_user: "{{ flarum_user }}"
+    - name: Configure Nginx for Flarum
+      copy:
+        content: |
+          server {
+              listen 80;
+              listen [::]:80;
+              server_name _;
+              root {{ flarum_home }}/public;
+              index index.php index.html;
 
-        - name: Extract Flarum
-          unarchive:
-            src: "{{ flarum_home }}/flarum-{{ flarum_version }}.tar.gz"
-            dest: "{{ flarum_home }}"
-            remote_src: yes
-            owner: "{{ flarum_user }}"
-            group: "{{ flarum_user }}"
+              location / {
+                  try_files $uri $uri/ /index.php?$query_string;
+              }
 
-        - name: Install Composer dependencies
-          composer:
-            command: install
-            working_dir: "{{ flarum_home }}"
-            no_dev: yes
-          become_user: "{{ flarum_user }}"
+              location ~ \.php$ {
+                  fastcgi_pass unix:/run/php/php{{ php_version }}-fpm.sock;
+                  fastcgi_index index.php;
+                  fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                  include fastcgi_params;
+              }
 
-    - name: Configure PHP-FPM
-      template:
-        src: php-fpm.conf.j2
-        dest: /etc/opt/remi/php81/php-fpm.d/www.conf
-        backup: yes
-      notify: restart php-fpm
+              location ~ /\.ht {
+                  deny all;
+              }
 
-    - name: Configure PHP
-      template:
-        src: php.ini.j2
-        dest: /etc/opt/remi/php81/php.ini
-        backup: yes
-      notify: restart php-fpm
+              location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+                  expires max;
+                  log_not_found off;
+              }
+          }
+        dest: /etc/nginx/sites-available/flarum
+        mode: "0644"
 
-    - name: Configure Nginx
-      template:
-        src: nginx.conf.j2
-        dest: /etc/nginx/conf.d/flarum.conf
-        backup: yes
-      notify: restart nginx
+    - name: Enable Flarum Nginx site
+      file:
+        src: /etc/nginx/sites-available/flarum
+        dest: /etc/nginx/sites-enabled/flarum
+        state: link
 
-    - name: Set proper permissions
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: Set proper permissions for Flarum
       file:
         path: "{{ flarum_home }}"
         recurse: yes
-        owner: "{{ flarum_user }}"
-        group: "{{ flarum_user }}"
+        owner: www-data
+        group: www-data
         mode: "0755"
 
     - name: Set storage directory permissions
       file:
         path: "{{ flarum_home }}/storage"
         recurse: yes
-        owner: "{{ nginx_user }}"
-        group: "{{ nginx_user }}"
+        owner: www-data
+        group: www-data
         mode: "0775"
+      ignore_errors: yes
 
-    - name: Configure log rotation
-      template:
-        src: logrotate.conf.j2
-        dest: /etc/logrotate.d/flarum
-        backup: yes
-
-    - name: Create log directory
-      file:
-        path: /var/log/flarum
-        state: directory
-        owner: "{{ nginx_user }}"
-        group: "{{ nginx_user }}"
-        mode: "0755"
-
-    - name: Create memory monitoring script
-      copy:
-        content: |
-          #!/bin/bash
-          # Memory monitoring script for e2-micro
-
-          # Check memory usage
-          MEMORY_USAGE=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
-          SWAP_USAGE=$(free | grep Swap | awk '{printf "%.1f", $3/$2 * 100.0}')
-
-          # Log memory status
-          echo "$(date): Memory: ${MEMORY_USAGE}%, Swap: ${SWAP_USAGE}%" >> /var/log/flarum/memory.log
-
-          # Alert if memory usage is too high
-          if (( $(echo "$MEMORY_USAGE > 90" | bc -l) )); then
-            echo "$(date): WARNING: High memory usage: ${MEMORY_USAGE}%" >> /var/log/flarum/memory.log
-          fi
-
-          # Alert if swap usage is too high
-          if (( $(echo "$SWAP_USAGE > 80" | bc -l) )); then
-            echo "$(date): WARNING: High swap usage: ${SWAP_USAGE}%" >> /var/log/flarum/memory.log
-          fi
-        dest: /usr/local/bin/memory-monitor.sh
-        mode: "0755"
-
-    - name: Create systemd timer for memory monitoring
-      copy:
-        content: |
-          [Unit]
-          Description=Memory monitoring for Flarum
-          Requires=memory-monitor.service
-
-          [Timer]
-          OnBootSec=5min
-          OnUnitActiveSec=5min
-
-          [Install]
-          WantedBy=timers.target
-        dest: /etc/systemd/system/memory-monitor.timer
-        mode: "0644"
-
-    - name: Create systemd service for memory monitoring
-      copy:
-        content: |
-          [Unit]
-          Description=Memory monitoring for Flarum
-
-          [Service]
-          Type=oneshot
-          ExecStart=/usr/local/bin/memory-monitor.sh
-          User=root
-        dest: /etc/systemd/system/memory-monitor.service
-        mode: "0644"
-
-    - name: Enable and start memory monitoring timer
-      systemd:
-        name: memory-monitor.timer
-        enabled: yes
-        state: started
-        daemon_reload: yes
-
-    - name: Enable and start services
+    - name: Restart services
       systemd:
         name: "{{ item }}"
+        state: restarted
         enabled: yes
-        state: started
       loop:
         - nginx
-        - php81-php-fpm
+        - php{{ php_version }}-fpm
 
-    - name: Configure Flarum database connection
-      template:
-        src: config.php.j2
-        dest: "{{ flarum_home }}/config.php"
-        owner: "{{ flarum_user }}"
-        group: "{{ flarum_user }}"
-        mode: "0644"
-      notify: restart nginx
-
-  handlers:
-    - name: restart nginx
-      systemd:
-        name: nginx
-        state: restarted
-
-    - name: restart php-fpm
-      systemd:
-        name: php81-php-fpm
-        state: restarted
+    - name: Display completion message
+      debug:
+        msg: |
+          ========================================
+          Flarum installation complete!
+          
+          Access your forum at: http://{{ ansible_default_ipv4.address }}
+          
+          Complete the setup wizard in your browser:
+          - Database Host: localhost
+          - Database Name: {{ db_name }}
+          - Database User: {{ db_user }}
+          - Database Password: (the one you provided)
+          ========================================

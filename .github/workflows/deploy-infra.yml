@@ -1,0 +1,100 @@
+name: Deploy Infrastructure Only (Ubuntu)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/deploy-infra.yml'
+
+env:
+  TF_VERSION: 1.5.0
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+
+jobs:
+  # ========================================
+  # 1. DEPLOY INFRASTRUCTURE
+  # ========================================
+  deploy-infrastructure:
+    name: 🏗️ Deploy Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configure GCP credentials
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: ☁️ Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: 🎯 Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: 📋 Terraform Plan
+        working-directory: ./terraform
+        run: terraform plan -out=tfplan
+
+      - name: 🚀 Terraform Apply
+        working-directory: ./terraform
+        run: terraform apply -auto-approve tfplan
+
+      - name: 📤 Get VM IP
+        id: terraform-outputs
+        working-directory: ./terraform
+        run: |
+          VM_IP=$(terraform output -raw vm_ip)
+          echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
+          echo "✅ VM IP: $VM_IP"
+
+      - name: ⏳ Wait for VM to boot
+        run: |
+          echo "Waiting 60 seconds for Ubuntu VM to fully boot..."
+          sleep 60
+
+  # ========================================
+  # 2. VERIFICATION
+  # ========================================
+  verify-infrastructure:
+    name: ✅ Verify Infrastructure
+    runs-on: ubuntu-latest
+    needs: deploy-infrastructure
+    timeout-minutes: 5
+    
+    steps:
+      - name: 🔐 Configure GCP credentials
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: ☁️ Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🔍 Verify VM is running
+        run: |
+          VM_STATUS=$(gcloud compute instances describe flarum-vm --zone=us-central1-a --format="value(status)")
+          echo "VM Status: $VM_STATUS"
+          if [ "$VM_STATUS" == "RUNNING" ]; then
+            echo "✅ VM is running"
+          else
+            echo "❌ VM is not running"
+            exit 1
+          fi
+
+      - name: 🌐 Test VM connectivity
+        run: |
+          VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
+          echo "Testing connectivity to VM at $VM_IP"
+          ping -c 3 $VM_IP || echo "Ping test completed"
+

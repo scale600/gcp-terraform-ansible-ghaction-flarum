@@ -136,7 +136,7 @@ resource "google_compute_instance" "flarum_vm" {
 
   boot_disk {
     initialize_params {
-      image = "rocky-linux-cloud/rocky-linux-9-optimized-gcp"
+      image = "ubuntu-os-cloud/ubuntu-2204-lts"
       size  = 20
       type  = "pd-standard"
     }
@@ -153,7 +153,7 @@ resource "google_compute_instance" "flarum_vm" {
   tags = ["flarum-web"]
 
   metadata = {
-    ssh-keys = "rocky:${file("${path.module}/../ansible/flarum_devops.pub")}"
+    ssh-keys = "ubuntu:${file("${path.module}/../ansible/flarum_devops.pub")}"
   }
 
   metadata_startup_script = <<-EOF
@@ -161,19 +161,20 @@ resource "google_compute_instance" "flarum_vm" {
     set -e
     
     # Ensure SSH is running and configured
-    systemctl enable sshd
-    systemctl start sshd
-    systemctl status sshd
+    systemctl enable ssh
+    systemctl start ssh
     
     # Configure SSH for better connectivity
     sed -i 's/#ClientAliveInterval 0/ClientAliveInterval 60/' /etc/ssh/sshd_config
     sed -i 's/#ClientAliveCountMax 3/ClientAliveCountMax 10/' /etc/ssh/sshd_config
     sed -i 's/#TCPKeepAlive yes/TCPKeepAlive yes/' /etc/ssh/sshd_config
-    systemctl restart sshd
+    systemctl restart ssh
+    
+    # Update package lists (lightweight)
+    apt-get update
     
     # Basic system setup (non-blocking)
-    dnf update -y || true
-    dnf install -y wget curl git || true
+    apt-get install -y wget curl git python3 || true
     
     # Signal that startup is complete
     echo "VM startup completed successfully" > /tmp/startup-complete

@@ -1,147 +1,145 @@
-# GCP Flarum Deployment
+# Flarum on GCP with Terraform, Ansible & GitHub Actions
 
-Deploy Flarum forum on GCP Free Tier with Terraform + Ansible + GitHub Actions.
+Automated deployment of Flarum forum on Google Cloud Platform using Ubuntu 22.04 LTS.
 
-## 🚀 Quick Start
+## Features
 
-1. **Fork this repo**
-2. **Set GitHub Secrets** (see below)
-3. **Push to main** - auto-deploy!
+- ✅ **Ubuntu 22.04 LTS** - Fast and lightweight OS
+- ✅ **GCP Free Tier** - e2-micro VM (0.25-1GB RAM)
+- ✅ **Automated CI/CD** - GitHub Actions workflows
+- ✅ **Infrastructure as Code** - Terraform for GCP resources
+- ✅ **Configuration Management** - Ansible for application setup
+- ✅ **Optimized Performance** - 2GB swap for stability
 
-## 🔑 Required GitHub Secrets
+## Quick Start
 
-Go to: Settings > Secrets and variables > Actions
+### 1. Prerequisites
 
-| Secret | Value |
-|--------|-------|
-| `GCP_PROJECT_ID` | Your GCP project ID |
-| `GCP_SA_KEY` | Service account JSON key |
-| `GCP_SSH_PRIVATE_KEY` | SSH private key |
-| `DB_PASSWORD` | Database password |
+- GCP account with billing enabled
+- GitHub repository with secrets configured
+- GCP Service Account with necessary permissions
 
-## 🛠️ Setup
+### 2. Configure GitHub Secrets
 
-### 1. GCP Setup
+Go to your repository → Settings → Secrets and add:
 
-```bash
-# Create project
-gcloud projects create YOUR_PROJECT_ID
+| Secret Name | Description | Example |
+|-------------|-------------|---------|
+| `GCP_PROJECT_ID` | Your GCP project ID | `my-flarum-project` |
+| `GCP_SA_KEY` | Service Account JSON key | `{"type": "service_account"...}` |
+| `GCP_SSH_PRIVATE_KEY` | SSH private key for VM access | `-----BEGIN RSA PRIVATE KEY-----` |
+| `DB_PASSWORD` | Database password | `MySecurePass123!` |
 
-# Enable APIs
-gcloud services enable compute.googleapis.com sqladmin.googleapis.com
+See [SECRETS.md](SECRETS.md) for detailed setup instructions.
 
-# Create service account
-gcloud iam service-accounts create flarum-deployer --project=YOUR_PROJECT_ID
-
-# Grant permissions
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-    --member="serviceAccount:flarum-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/compute.admin"
-
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-    --member="serviceAccount:flarum-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/cloudsql.admin"
-
-# Create key
-gcloud iam service-accounts keys create key.json \
-    --iam-account=flarum-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com
-```
-
-### 2. SSH Key
+### 3. Deploy Infrastructure
 
 ```bash
-# Generate SSH key
-ssh-keygen -t rsa -b 4096 -f ~/.ssh/flarum_devops
-
-# Add to GCP
-gcloud compute project-info add-metadata \
-    --metadata-from-file ssh-keys=~/.ssh/flarum_devops.pub
+# Manually trigger infrastructure deployment
+gh workflow run deploy-infra.yml
 ```
 
-### 3. GitHub Secrets
+Or push changes to `terraform/**` to trigger automatically.
+
+### 4. Deploy Application
 
 ```bash
-# Set secrets
-gh secret set GCP_PROJECT_ID --body "YOUR_PROJECT_ID"
-gh secret set GCP_SA_KEY --body "$(cat key.json)"
-gh secret set GCP_SSH_PRIVATE_KEY --body "$(cat ~/.ssh/flarum_devops)"
-gh secret set DB_PASSWORD --body "YOUR_PASSWORD"
+# Manually trigger application deployment
+gh workflow run deploy-app-only.yml
 ```
 
-## 📁 Project Structure
+Or push changes to `ansible/**` to trigger automatically.
+
+### 5. Access Your Forum
+
+After successful deployment, access your Flarum forum at:
 
 ```
-├── terraform/          # Infrastructure code
-├── ansible/           # Application deployment
-├── .github/workflows/ # CI/CD pipelines
-└── scripts/           # Utility scripts
+http://<VM_IP_ADDRESS>
 ```
 
-## 🎯 What Gets Deployed
+Complete the web installer:
+- **Database Host**: `localhost`
+- **Database Name**: `flarum`
+- **Database User**: `flarum`
+- **Database Password**: Your `DB_PASSWORD` secret
 
-- **VM**: e2-micro (1 vCPU, 1GB RAM)
-- **Database**: Cloud SQL (db-f1-micro)
-- **OS**: Rocky Linux 9
-- **Web**: Nginx + PHP 8.1 + Flarum
+## Architecture
 
-## 🔧 Customization
-
-Edit these files to customize:
-
-- `terraform/main.tf` - Infrastructure settings
-- `ansible/playbook.yml` - Application configuration
-- `ansible/templates/` - Configuration templates
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **API not enabled**: Enable Compute Engine and Cloud SQL APIs
-2. **Permission denied**: Check service account roles
-3. **SSH failed**: Verify SSH key in GCP metadata
-4. **Deployment timeout**: Check VM startup logs
-
-### Cleanup
-
-```bash
-# Remove all resources
-./scripts/cleanup-gcp-resources.sh
+```
+GitHub Actions
+├── deploy-infra.yml (Infrastructure)
+│   └── Terraform → GCP Resources
+│       ├── VPC Network
+│       ├── Subnet
+│       ├── Firewall Rules
+│       └── VM (Ubuntu 22.04)
+│
+└── deploy-app-only.yml (Application)
+    └── Ansible → VM Configuration
+        ├── System packages (Nginx, PHP, MySQL)
+        ├── Swap setup (2GB)
+        ├── Flarum installation
+        └── Service configuration
 ```
 
-## 📊 Monitoring
+## Tech Stack
 
-After deployment, access your forum at: `http://YOUR_VM_IP`
+- **OS**: Ubuntu 22.04 LTS (lighter than Rocky Linux)
+- **Web Server**: Nginx
+- **PHP**: 8.1 (via apt)
+- **Database**: MySQL 8.0
+- **Forum**: Flarum (latest stable)
 
-Check logs:
-```bash
-# VM logs
-sudo journalctl -u nginx
-sudo journalctl -u php81-php-fpm
+## Why Ubuntu?
 
-# Flarum logs
-sudo tail -f /var/log/flarum/memory.log
+Previously used Rocky Linux 9, but switched to Ubuntu 22.04 for:
+- ✅ **Better performance** on small instances (e2-micro)
+- ✅ **Faster SSH responsiveness**
+- ✅ **Lighter memory footprint**
+- ✅ **More stable** package management (apt vs dnf)
+- ✅ **Faster boot times**
+
+## Project Structure
+
+```
+.
+├── .github/workflows/
+│   ├── deploy-infra.yml        # Infrastructure deployment
+│   └── deploy-app-only.yml     # Application deployment
+├── terraform/
+│   └── main.tf                 # GCP resources (Ubuntu VM)
+├── ansible/
+│   ├── playbook.yml            # Flarum installation (Ubuntu)
+│   └── inventory.ini           # Dynamic inventory
+├── SECRETS.md                  # Secret setup guide
+└── README.md                   # This file
 ```
 
-## 💰 Cost
+## Troubleshooting
 
-- **Free Tier**: $0/month (within limits)
-- **VM**: e2-micro (744 hours/month free)
-- **Database**: db-f1-micro (744 hours/month free)
-- **Storage**: 30GB free
+### VM is slow or unresponsive
+- Ubuntu should be much faster than Rocky Linux
+- Check swap usage: `free -h`
+- Monitor memory: `top` or `htop`
 
-## 📚 Documentation
+### SSH connection timeout
+- Verify firewall rules allow port 22
+- Check VM status: `gcloud compute instances describe flarum-vm`
+- Ubuntu SSH should be more stable
 
-- [Performance Guide](PERFORMANCE_GUIDE.md) - Optimization tips
-- [Optimization Guide](OPTIMIZATION.md) - Resource tuning
-- [Secrets Setup](SECRETS.md) - Detailed secret configuration
+### Ansible fails
+- Ensure you're using `ansible_user=ubuntu` in inventory
+- Verify SSH key is correct
+- Check GitHub Actions logs for details
 
-## 🤝 Contributing
+## Cost Optimization
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+This setup uses GCP Free Tier:
+- **VM**: e2-micro (always free in us-central1)
+- **Disk**: 20GB standard persistent disk
+- **Network**: Egress limits apply
 
-## 📄 License
+## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License - Feel free to use and modify.
