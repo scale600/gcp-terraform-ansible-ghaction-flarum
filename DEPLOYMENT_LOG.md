@@ -5,3 +5,4 @@
 # Retry deployment with all GCP APIs enabled at Tue Oct 28 15:05:28 PDT 2025
 # Clean deployment after resource cleanup at Tue Oct 28 17:44:58 PDT 2025
 # Deploy after force cleanup at Tue Oct 28 18:02:12 PDT 2025
+# Deploy after manual VPC and SQL deletion at Tue Oct 28 18:11:52 PDT 2025
