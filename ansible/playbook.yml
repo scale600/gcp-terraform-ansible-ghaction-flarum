@@ -5,6 +5,7 @@
 - name: Deploy Flarum on Rocky Linux 9
   hosts: all
   become: yes
+  gather_facts: no
   vars:
     flarum_version: "1.8.2"
     php_version: "8.1"
@@ -17,6 +18,18 @@
     db_password: "{{ hostvars['localhost']['db_password'] | default('') }}"
 
   tasks:
+    - name: Wait for system to become reachable
+      wait_for_connection:
+        timeout: 300
+        delay: 10
+      retries: 3
+      delay: 20
+      register: connection_result
+      until: connection_result is success
+    
+    - name: Gather facts
+      setup:
+    
     - name: Update system packages
       dnf:
         name: "*"

@@ -158,9 +158,25 @@ resource "google_compute_instance" "flarum_vm" {
 
   metadata_startup_script = <<-EOF
     #!/bin/bash
-    # Basic system setup
-    dnf update -y
-    dnf install -y wget curl git
+    set -e
+    
+    # Ensure SSH is running and configured
+    systemctl enable sshd
+    systemctl start sshd
+    systemctl status sshd
+    
+    # Configure SSH for better connectivity
+    sed -i 's/#ClientAliveInterval 0/ClientAliveInterval 60/' /etc/ssh/sshd_config
+    sed -i 's/#ClientAliveCountMax 3/ClientAliveCountMax 10/' /etc/ssh/sshd_config
+    sed -i 's/#TCPKeepAlive yes/TCPKeepAlive yes/' /etc/ssh/sshd_config
+    systemctl restart sshd
+    
+    # Basic system setup (non-blocking)
+    dnf update -y || true
+    dnf install -y wget curl git || true
+    
+    # Signal that startup is complete
+    echo "VM startup completed successfully" > /tmp/startup-complete
   EOF
 }
 
