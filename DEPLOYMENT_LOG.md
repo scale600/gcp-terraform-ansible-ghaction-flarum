@@ -3,3 +3,4 @@
 # Waiting for GCP permissions to be granted at Tue Oct 28 14:42:06 PDT 2025
 # Retry deployment with Owner role permissions at Tue Oct 28 14:43:55 PDT 2025
 # Retry deployment with all GCP APIs enabled at Tue Oct 28 15:05:28 PDT 2025
+# Clean deployment after resource cleanup at Tue Oct 28 17:44:58 PDT 2025
