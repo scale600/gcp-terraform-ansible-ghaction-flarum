@@ -11,16 +11,22 @@
 inventory.ini
 ansible.cfg
 
-# SSH Keys
-*.pem
+# Environment & Secrets
+.env
+.env.*
+!.env.template
+!env.template
+secrets/
 *.key
-id_rsa*
-flarum-deploy*
-
-# GCP Service Account Keys
+*.pem
 *service-account*.json
 *flarum-deployer*.json
 riderwin-flarum-*.json
+
+# SSH Keys
+id_rsa*
+flarum_devops*
+*.pub
 
 # OS generated files
 .DS_Store
