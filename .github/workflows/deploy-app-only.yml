@@ -68,7 +68,7 @@ jobs:
             exit 1
           fi
           echo "Using VM IP: $VM_IP"
-          timeout 180 bash -c 'until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no rocky@$VM_IP "echo VM is ready"; do sleep 15; done'
+          timeout 180 bash -c "until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no rocky@$VM_IP 'echo VM is ready'; do sleep 15; done"
 
       - name: 📝 Create Ansible inventory
         run: |
