@@ -4,12 +4,12 @@ Configure these secrets in: Settings > Secrets and variables > Actions
 
 ## Required Secrets
 
-| Secret | Description | Example |
-|--------|-------------|---------|
-| `GCP_PROJECT_ID` | GCP project ID | `my-flarum-project` |
-| `GCP_SA_KEY` | Service account JSON | `{"type": "service_account"...}` |
-| `GCP_SSH_PRIVATE_KEY` | SSH private key | `-----BEGIN OPENSSH PRIVATE KEY-----` |
-| `DB_PASSWORD` | Database password | `MySecurePass123!` |
+| Secret                | Description          | Example                               |
+| --------------------- | -------------------- | ------------------------------------- |
+| `GCP_PROJECT_ID`      | GCP project ID       | `my-flarum-project`                   |
+| `GCP_SA_KEY`          | Service account JSON | `{"type": "service_account"...}`      |
+| `GCP_SSH_PRIVATE_KEY` | SSH private key      | `-----BEGIN OPENSSH PRIVATE KEY-----` |
+| `DB_PASSWORD`         | Database password    | `MySecurePass123!`                    |
 
 ## Quick Setup
 
