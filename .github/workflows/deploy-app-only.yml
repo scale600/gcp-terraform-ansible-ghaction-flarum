@@ -2,23 +2,6 @@ name: Deploy Flarum Application Only
 
 on:
   workflow_dispatch:
-    inputs:
-      vm_ip:
-        description: 'VM IP Address (leave empty for auto-detection)'
-        required: false
-        default: ''
-      db_host:
-        description: 'Database Host (leave empty for auto-detection)'
-        required: false
-        default: ''
-      db_name:
-        description: 'Database Name'
-        required: false
-        default: 'flarum'
-      db_user:
-        description: 'Database User'
-        required: false
-        default: 'flarum'
   push:
     branches: [main]
     paths:
@@ -42,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🐍 Setup Python for Ansible
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -66,14 +49,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           
           # Get VM IP dynamically
-          if [ -n "${{ github.event.inputs.vm_ip }}" ]; then
-            VM_IP="${{ github.event.inputs.vm_ip }}"
-          else
-            VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
-            if [ -z "$VM_IP" ]; then
-              echo "Error: Could not find VM IP"
-              exit 1
-            fi
+          VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
+          if [ -z "$VM_IP" ]; then
+            echo "Error: Could not find VM IP"
+            exit 1
           fi
           echo "Using VM IP: $VM_IP"
           
@@ -83,14 +62,10 @@ jobs:
       - name: ⏳ Wait for VM to be ready
         run: |
           # Get VM IP dynamically
-          if [ -n "${{ github.event.inputs.vm_ip }}" ]; then
-            VM_IP="${{ github.event.inputs.vm_ip }}"
-          else
-            VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
-            if [ -z "$VM_IP" ]; then
-              echo "Error: Could not find VM IP"
-              exit 1
-            fi
+          VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
+          if [ -z "$VM_IP" ]; then
+            echo "Error: Could not find VM IP"
+            exit 1
           fi
           echo "Using VM IP: $VM_IP"
           timeout 180 bash -c 'until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no rocky@$VM_IP "echo VM is ready"; do sleep 15; done'
@@ -98,20 +73,16 @@ jobs:
       - name: 📝 Create Ansible inventory
         run: |
           # Get VM IP dynamically
-          if [ -n "${{ github.event.inputs.vm_ip }}" ]; then
-            VM_IP="${{ github.event.inputs.vm_ip }}"
-          else
-            VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
-            if [ -z "$VM_IP" ]; then
-              echo "Error: Could not find VM IP"
-              exit 1
-            fi
+          VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
+          if [ -z "$VM_IP" ]; then
+            echo "Error: Could not find VM IP"
+            exit 1
           fi
           
           # Get DB host (same as VM IP for this setup)
-          DB_HOST="${{ github.event.inputs.db_host || $VM_IP }}"
-          DB_NAME="${{ github.event.inputs.db_name || 'flarum' }}"
-          DB_USER="${{ github.event.inputs.db_user || 'flarum' }}"
+          DB_HOST="$VM_IP"
+          DB_NAME="flarum"
+          DB_USER="flarum"
           
           echo "Using VM IP: $VM_IP, DB Host: $DB_HOST"
           
@@ -129,20 +100,16 @@ jobs:
       - name: 🎭 Run Ansible Playbook
         run: |
           # Get VM IP dynamically
-          if [ -n "${{ github.event.inputs.vm_ip }}" ]; then
-            VM_IP="${{ github.event.inputs.vm_ip }}"
-          else
-            VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
-            if [ -z "$VM_IP" ]; then
-              echo "Error: Could not find VM IP"
-              exit 1
-            fi
+          VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
+          if [ -z "$VM_IP" ]; then
+            echo "Error: Could not find VM IP"
+            exit 1
           fi
           
           # Get DB host (same as VM IP for this setup)
-          DB_HOST="${{ github.event.inputs.db_host || $VM_IP }}"
-          DB_NAME="${{ github.event.inputs.db_name || 'flarum' }}"
-          DB_USER="${{ github.event.inputs.db_user || 'flarum' }}"
+          DB_HOST="$VM_IP"
+          DB_NAME="flarum"
+          DB_USER="flarum"
           
           echo "Using VM IP: $VM_IP, DB Host: $DB_HOST"
           
@@ -158,14 +125,10 @@ jobs:
         id: terraform-outputs
         run: |
           # Get VM IP dynamically
-          if [ -n "${{ github.event.inputs.vm_ip }}" ]; then
-            VM_IP="${{ github.event.inputs.vm_ip }}"
-          else
-            VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
-            if [ -z "$VM_IP" ]; then
-              echo "Error: Could not find VM IP"
-              exit 1
-            fi
+          VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
+          if [ -z "$VM_IP" ]; then
+            echo "Error: Could not find VM IP"
+            exit 1
           fi
           echo "Using VM IP: $VM_IP"
           echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
