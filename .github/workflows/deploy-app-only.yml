@@ -59,6 +59,28 @@ jobs:
           # Add VM to known_hosts with timeout
           timeout 30 ssh-keyscan -H $VM_IP >> ~/.ssh/known_hosts || echo "SSH key scan failed, continuing..."
 
+      - name: 🔍 Debug VM Status
+        run: |
+          # Get VM IP dynamically
+          VM_IP=$(gcloud compute instances list --filter="name:flarum-vm" --format="value(EXTERNAL_IP)" --limit=1)
+          if [ -z "$VM_IP" ]; then
+            echo "Error: Could not find VM IP"
+            exit 1
+          fi
+          echo "Using VM IP: $VM_IP"
+          
+          # Check VM status
+          echo "Checking VM status..."
+          gcloud compute instances describe flarum-vm --format="value(status)" || echo "VM not found"
+          
+          # Test basic connectivity
+          echo "Testing basic connectivity..."
+          ping -c 3 $VM_IP || echo "Ping failed"
+          
+          # Test SSH port
+          echo "Testing SSH port..."
+          nc -z -v $VM_IP 22 || echo "SSH port not accessible"
+
       - name: ⏳ Wait for VM to be ready
         run: |
           # Get VM IP dynamically
@@ -68,7 +90,19 @@ jobs:
             exit 1
           fi
           echo "Using VM IP: $VM_IP"
-          timeout 180 bash -c "until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no rocky@$VM_IP 'echo VM is ready'; do sleep 15; done"
+          
+          # Wait for SSH with more detailed logging
+          echo "Waiting for SSH to be ready..."
+          for i in {1..12}; do
+            echo "Attempt $i/12..."
+            if ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no rocky@$VM_IP 'echo VM is ready' 2>/dev/null; then
+              echo "SSH connection successful!"
+              break
+            else
+              echo "SSH attempt $i failed, waiting 15 seconds..."
+              sleep 15
+            fi
+          done
 
       - name: 📝 Create Ansible inventory
         run: |
